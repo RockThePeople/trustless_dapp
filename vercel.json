@@ -1,0 +1,9 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/beacon-proxy/:path*", "destination": "/api/beacon-proxy" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
