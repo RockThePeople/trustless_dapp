@@ -1,6 +1,9 @@
 export const config = { runtime: 'edge' }
 
-const TARGET = process.env.VITE_CONSENSUS_RPC_URL ?? 'https://ethereum-sepolia-beacon-api.publicnode.com'
+// @ts-ignore — process.env is available in Vercel Edge Runtime
+const TARGET = (typeof process !== 'undefined' && process.env.VITE_CONSENSUS_RPC_URL)
+  ? process.env.VITE_CONSENSUS_RPC_URL
+  : 'https://ethereum-sepolia-beacon-api.publicnode.com'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
