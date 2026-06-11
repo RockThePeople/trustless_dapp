@@ -160,33 +160,15 @@ export default function FormatBoard({ client, heliosReady }: Props) {
         )}
 
         {formats?.map((fmt) => (
-          <div key={fmt.id.toString()} style={styles.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <strong>{fmt.name}</strong>
-                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '2px' }}>
-                  Issuer: {fmt.issuer.slice(0, 10)}...&nbsp;
-                  · 등록일 {new Date(Number(fmt.createdAt) * 1000).toLocaleDateString()}
-                </div>
-              </div>
-              {fmt.issuer.toLowerCase() === address.toLowerCase() ? (
-                <button
-                  onClick={() => handleDeactivate(fmt.id)}
-                  disabled={deactLoading === fmt.id}
-                  style={{ ...styles.smallBtn, color: '#c33', borderColor: '#c33' }}
-                >
-                  {deactLoading === fmt.id ? '처리 중...' : '비활성화'}
-                </button>
-              ) : (
-                <button
-                  onClick={() => setReqFormat(fmt)}
-                  style={styles.smallBtn}
-                >
-                  이 형식 요청하기
-                </button>
-              )}
-            </div>
-          </div>
+          <FormatCard
+            key={fmt.id.toString()}
+            fmt={fmt}
+            myAddress={address}
+            heliosReady={heliosReady}
+            deactLoading={deactLoading}
+            onDeactivate={handleDeactivate}
+            onRequest={setReqFormat}
+          />
         ))}
       </section>
 
@@ -230,6 +212,50 @@ export default function FormatBoard({ client, heliosReady }: Props) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── FormatCard: per-card sub-component so useENSName runs per issuer ──────────
+
+type CardProps = {
+  fmt: VcFormat
+  myAddress: string
+  heliosReady: boolean
+  deactLoading: bigint | null
+  onDeactivate: (id: bigint) => void
+  onRequest: (fmt: VcFormat) => void
+}
+
+function FormatCard({ fmt, myAddress, heliosReady, deactLoading, onDeactivate, onRequest }: CardProps) {
+  const issuerEns = useENSName(fmt.issuer, heliosReady)
+  const issuerLabel = issuerEns ?? `${fmt.issuer.slice(0, 10)}...`
+  const isMyFormat = fmt.issuer.toLowerCase() === myAddress.toLowerCase()
+
+  return (
+    <div style={styles.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <strong>{fmt.name}</strong>
+          <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '2px' }}>
+            Issuer: {issuerLabel}&nbsp;
+            · 등록일 {new Date(Number(fmt.createdAt) * 1000).toLocaleDateString()}
+          </div>
+        </div>
+        {isMyFormat ? (
+          <button
+            onClick={() => onDeactivate(fmt.id)}
+            disabled={deactLoading === fmt.id}
+            style={{ ...styles.smallBtn, color: '#c33', borderColor: '#c33' }}
+          >
+            {deactLoading === fmt.id ? '처리 중...' : '비활성화'}
+          </button>
+        ) : (
+          <button onClick={() => onRequest(fmt)} style={styles.smallBtn}>
+            이 형식 요청하기
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -190,8 +190,12 @@ function getContractAddress(): `0x${string}` {
   return addr
 }
 
+// @scure/base base64url requires padded input (length divisible by 4).
+// WebAuthn credential.id and our proof fields may be unpadded → add padding first.
 function b64urlToBytes(b64url: string): Uint8Array {
-  return base64url.decode(b64url)
+  const rem = b64url.length % 4
+  const padded = rem === 0 ? b64url : b64url + '='.repeat(4 - rem)
+  return base64url.decode(padded)
 }
 
 // ── Core VC functions ─────────────────────────────────────────────────────────
@@ -293,9 +297,9 @@ export async function verifyVcSignature(vc: VerifiableCredential): Promise<boole
     const did = proof.verificationMethod.split('#')[0]
     const pubKeyBytes = publicKeyBytesFromDid(did)
 
-    const rawSig         = base64url.decode(proof.proofValue)
-    const authData       = base64url.decode(proof.authenticatorData)
-    const clientDataHash = base64url.decode(proof.clientDataHash)
+    const rawSig         = b64urlToBytes(proof.proofValue)
+    const authData       = b64urlToBytes(proof.authenticatorData)
+    const clientDataHash = b64urlToBytes(proof.clientDataHash)
 
     // WebAuthn signed data: authenticatorData || SHA-256(clientDataJSON)
     const dataToVerify = new Uint8Array(authData.length + clientDataHash.length)
