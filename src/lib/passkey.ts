@@ -148,6 +148,30 @@ async function _extractP256Coords(spkiDer: ArrayBuffer): Promise<{ pubX: bigint;
 }
 
 /**
+ * Performs a WebAuthn assertion (navigator.credentials.get) for a stored key.
+ * Triggers the biometric/PIN prompt and throws if the user cancels or fails.
+ * Does not use the result — this is purely for liveness/consent verification.
+ */
+export async function assertPasskeyBiometric(key: WebAuthnKey): Promise<void> {
+  const credBytes = _b64urlToUint8Array(key.authenticatorId)
+  const credId    = credBytes.buffer.slice(
+    credBytes.byteOffset, credBytes.byteOffset + credBytes.byteLength,
+  ) as ArrayBuffer
+  const challengeArr = crypto.getRandomValues(new Uint8Array(32))
+  const challenge    = challengeArr.buffer.slice(0, 32) as ArrayBuffer
+  const credential   = (await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      rpId:             window.location.hostname,
+      allowCredentials: [{ type: 'public-key', id: credId }],
+      userVerification: 'required',
+      timeout:          60_000,
+    },
+  })) as PublicKeyCredential | null
+  if (!credential) throw new Error('생체 인증이 취소되었습니다')
+}
+
+/**
  * Creates a new WebAuthn credential and returns the public key.
  * Does NOT save to localStorage — caller must call saveWebAuthnKey() after
  * creating the wallet client so aaAddress can be included.

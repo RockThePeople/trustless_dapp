@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   listSavedWebAuthnKeys,
   registerPasskey,
+  assertPasskeyBiometric,
   loadWebAuthnKeyById,
   saveWebAuthnKey,
   setLastUsedId,
@@ -38,10 +39,13 @@ export default function Login({ onLogin }: Props) {
     setError('')
     setLoading(true)
     try {
-      setStatus('AA 지갑을 복원하는 중...')
       const webAuthnKey = loadWebAuthnKeyById(stored.authenticatorId)
       if (!webAuthnKey) throw new Error('저장된 키를 불러올 수 없습니다')
 
+      setStatus('지문 인증 중...')
+      await assertPasskeyBiometric(webAuthnKey)
+
+      setStatus('AA 지갑을 복원하는 중...')
       const client  = await createSmartWalletClient(webAuthnKey)
       const address = getAccountAddress(client)
 
@@ -52,6 +56,7 @@ export default function Login({ onLogin }: Props) {
         setLastUsedId(stored.authenticatorId)
       }
 
+      sessionStorage.setItem('dapp_session', '1')
       setStatus(`복원 완료 — AA: ${address}`)
       onLogin(client)
     } catch (e) {
@@ -84,6 +89,7 @@ export default function Login({ onLogin }: Props) {
         setStatus(`지갑 준비 완료 — AA: ${address}`)
       }
 
+      sessionStorage.setItem('dapp_session', '1')
       onLogin(client)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

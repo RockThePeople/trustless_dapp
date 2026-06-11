@@ -18,19 +18,29 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [voteRefresh,  setVoteRefresh]  = useState(0)
   const [tab,          setTab]          = useState<Tab>('data')
-  // true while attempting silent auto-login from stored key
-  const [autoLogging,  setAutoLogging]  = useState(() => getLastUsedKey() !== null)
+  // true while attempting silent auto-login from stored key (session already authenticated this tab)
+  const [autoLogging,  setAutoLogging]  = useState(
+    () => !!sessionStorage.getItem('dapp_session') && getLastUsedKey() !== null,
+  )
 
   useEffect(() => {
+    if (!sessionStorage.getItem('dapp_session')) {
+      setAutoLogging(false)
+      return
+    }
     const key = getLastUsedKey()
-    if (!key) return
+    if (!key) {
+      sessionStorage.removeItem('dapp_session')
+      setAutoLogging(false)
+      return
+    }
     createSmartWalletClient(key)
       .then((c) => {
         setLastUsedId(key.authenticatorId)
         setClient(c)
       })
       .catch(() => {
-        // silent failure — user can log in manually
+        sessionStorage.removeItem('dapp_session')
       })
       .finally(() => setAutoLogging(false))
   }, [])
@@ -68,7 +78,7 @@ export default function App() {
             AA 주소: <code style={{ wordBreak: 'break-all' }}>{client.account.address}</code>
           </div>
           <button
-            onClick={() => setClient(null)}
+            onClick={() => { sessionStorage.removeItem('dapp_session'); setClient(null) }}
             style={{ fontSize: '0.8rem', background: '#eee', color: '#333', padding: '0.2rem 0.6rem', marginBottom: '1.25rem' }}
           >
             로그아웃
