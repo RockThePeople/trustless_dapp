@@ -33,6 +33,9 @@ export function getConfig() {
     smartWalletFactory: optionalEnv('VITE_SMART_WALLET_FACTORY') as `0x${string}` | undefined,
     passkeyRegistryAddress: optionalEnv('VITE_PASSKEY_REGISTRY_ADDRESS') as `0x${string}` | undefined,
     zerodevProjectId: optionalEnv('VITE_ZERODEV_PROJECT_ID'),
+    miniEnsAddress: optionalEnv('VITE_MINI_ENS_ADDRESS') as `0x${string}` | undefined,
+    votingRegistryAddress: optionalEnv('VITE_VOTING_REGISTRY_ADDRESS') as `0x${string}` | undefined,
+    vcRegistryAddress: optionalEnv('VITE_VC_REGISTRY_ADDRESS') as `0x${string}` | undefined,
   } as const
 }
 
@@ -48,6 +51,16 @@ export function getMissingEnvKeys(): string[] {
     'VITE_ZERODEV_PROJECT_ID',
   ]
   return required.filter((k) => !import.meta.env[k])
+}
+
+// Optional v2/v3 contracts — app starts without them; individual tabs show "미배포" notice.
+export function getMissingOptionalEnvKeys(): string[] {
+  const optional = [
+    'VITE_MINI_ENS_ADDRESS',
+    'VITE_VOTING_REGISTRY_ADDRESS',
+    'VITE_VC_REGISTRY_ADDRESS',
+  ]
+  return optional.filter((k) => !import.meta.env[k])
 }
 
 void requireEnv

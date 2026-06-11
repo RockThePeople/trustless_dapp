@@ -1,14 +1,39 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getMissingEnvKeys } from './config'
+import { getLastUsedKey, setLastUsedId } from './lib/passkey'
+import { createSmartWalletClient } from './lib/wallet'
 import Login from './components/Login'
 import DataEditor from './components/DataEditor'
 import DataViewer from './components/DataViewer'
+import ENSRegistrar from './components/ENSRegistrar'
+import CreateProposal from './components/CreateProposal'
+import ProposalList from './components/ProposalList'
+import VCTab from './components/vc/VCTab'
+import Nav, { type Tab } from './components/Nav'
 import type { SmartWalletClient } from './lib/wallet'
 
 export default function App() {
   const missing = getMissingEnvKeys()
-  const [client, setClient] = useState<SmartWalletClient | null>(null)
+  const [client,       setClient]       = useState<SmartWalletClient | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [voteRefresh,  setVoteRefresh]  = useState(0)
+  const [tab,          setTab]          = useState<Tab>('data')
+  // true while attempting silent auto-login from stored key
+  const [autoLogging,  setAutoLogging]  = useState(() => getLastUsedKey() !== null)
+
+  useEffect(() => {
+    const key = getLastUsedKey()
+    if (!key) return
+    createSmartWalletClient(key)
+      .then((c) => {
+        setLastUsedId(key.authenticatorId)
+        setClient(c)
+      })
+      .catch(() => {
+        // silent failure — user can log in manually
+      })
+      .finally(() => setAutoLogging(false))
+  }, [])
 
   if (missing.length > 0) {
     return (
@@ -33,7 +58,9 @@ export default function App() {
     <div style={{ padding: '2rem', maxWidth: '600px', fontFamily: 'monospace' }}>
       <h1>Trustless dApp PoC</h1>
 
-      {!client ? (
+      {autoLogging ? (
+        <p style={{ color: '#888', marginTop: '1.5rem' }}>자동 로그인 중...</p>
+      ) : !client ? (
         <Login onLogin={setClient} />
       ) : (
         <>
@@ -42,22 +69,47 @@ export default function App() {
           </div>
           <button
             onClick={() => setClient(null)}
-            style={{ fontSize: '0.8rem', background: '#eee', color: '#333', padding: '0.2rem 0.6rem' }}
+            style={{ fontSize: '0.8rem', background: '#eee', color: '#333', padding: '0.2rem 0.6rem', marginBottom: '1.25rem' }}
           >
             로그아웃
           </button>
 
-          <DataEditor
-            client={client}
-            onSuccess={() => setRefreshTrigger((n) => n + 1)}
-          />
+          <Nav tab={tab} onTabChange={setTab} />
 
-          <hr style={{ margin: '1.5rem 0', borderColor: '#eee' }} />
+          {tab === 'data' && (
+            <>
+              <DataEditor
+                client={client}
+                onSuccess={() => setRefreshTrigger((n) => n + 1)}
+              />
+              <hr style={{ margin: '1.5rem 0', borderColor: '#eee' }} />
+              <DataViewer
+                client={client}
+                refreshTrigger={refreshTrigger}
+              />
+            </>
+          )}
 
-          <DataViewer
-            client={client}
-            refreshTrigger={refreshTrigger}
-          />
+          {tab === 'ens' && (
+            <ENSRegistrar client={client} />
+          )}
+
+          {tab === 'vote' && (
+            <>
+              <CreateProposal
+                client={client}
+                onSuccess={() => setVoteRefresh((n) => n + 1)}
+              />
+              <ProposalList
+                client={client}
+                refreshTrigger={voteRefresh}
+              />
+            </>
+          )}
+
+          {tab === 'vc' && (
+            <VCTab client={client} />
+          )}
         </>
       )}
     </div>

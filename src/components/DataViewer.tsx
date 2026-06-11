@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { datastoreGetAll, datastoreRemove, type Entry } from '../lib/datastore'
 import { initHelios, resetHelios, heliosStatus, isOutOfSync, type HeliosStatus } from '../lib/helios'
+import { useENSName } from '../hooks/useENSName'
 import type { SmartWalletClient } from '../lib/wallet'
 
 type Props = {
@@ -35,6 +36,7 @@ export default function DataViewer({ client, refreshTrigger }: Props) {
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
 
   const address = client.account.address
+  const ensName = useENSName(address, syncStatus === 'ready')
 
   function triggerResync() {
     resetHelios()
@@ -98,7 +100,14 @@ export default function DataViewer({ client, refreshTrigger }: Props) {
   return (
     <div style={{ marginTop: '1.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0 }}>저장된 데이터</h3>
+        <h3 style={{ margin: 0 }}>
+          저장된 데이터
+          {ensName && (
+            <span style={{ fontWeight: 'normal', fontSize: '0.85rem', color: '#2a6', marginLeft: '0.5rem' }}>
+              ({ensName})
+            </span>
+          )}
+        </h3>
         <span style={{ fontSize: '0.8rem', color: STATUS_COLOR[syncStatus] }}>
           {STATUS_LABEL[syncStatus]}
         </span>

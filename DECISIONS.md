@@ -82,6 +82,18 @@ PoC 진행 중 내린 주요 결정과 이유를 기록한다.
 
 ---
 
+## 7. 익명 투표의 범위 — ZK 제외, 가명 방식 선택
+
+**결정**: 온체인 완전 익명(ZK proof) 투표를 구현하지 않는다. AA 지갑 주소 기반의 가명(pseudonymous) 투표로 처리하고, UI에서 MiniENS 이름으로 원시 주소를 감춘다.
+
+**이유**:
+- ZK 기반 익명 투표(Semaphore, MACI 등)는 별도의 ZK 회로 설계, 증명 생성 클라이언트, 검증자 컨트랙트가 필요하다. 이 PoC의 범위를 크게 초과한다.
+- AA 지갑 주소는 EOA와 달리 Passkey 자격증명에 묶여 있고 PasskeyRegistry를 통해 식별 가능하다. 완전한 익명성은 아니지만, EOA 직접 노출보다 강한 프라이버시 격리를 제공한다.
+- MiniENS 이름 레이어를 통해 사용자가 선택한 가명으로 투표 결과를 표시한다. 실명 없이 참여 가능하다.
+- 컨트랙트의 `hasVoted(proposalId, address)` 구조는 향후 ZK 익명 투표(Semaphore group membership proof)로 교체할 수 있도록 설계됐다.
+
+---
+
 ## 6. Vite + React 선택, Next.js 미사용
 
 **결정**: 프론트엔드는 Vite + React SPA. SSR 없음.
@@ -90,3 +102,51 @@ PoC 진행 중 내린 주요 결정과 이유를 기록한다.
 - Helios WASM은 브라우저 전용이다 — Node.js 환경에서 실행되는 SSR과 호환되지 않는다.
 - Vercel Edge Function(`api/beacon-proxy.ts`)으로 서버 기능이 필요한 부분만 분리했다.
 - `vite-plugin-wasm`으로 WASM 번들링이 간단하게 해결된다.
+
+---
+
+## 8. did:key 선택 이유 (did:ethr 대비)
+
+**결정**: DID 방식으로 `did:key`를 사용한다. 별도 레지스트리 컨트랙트 없음.
+
+**이유**:
+- `did:ethr`는 DID Registry 컨트랙트가 필요하고, 키 회전/복구 기능을 위한 별도 인프라가 필요하다. PoC 범위를 초과한다.
+- `did:key`는 P-256 공개키에서 결정론적으로 도출된다 — Passkey 공개키(x, y)가 있으면 항상 동일한 DID를 재계산할 수 있어 별도 저장소가 불필요하다.
+- Passkey P-256 공개키는 등록 시 추출(`_extractP256Coords`)해 localStorage에 이미 보관하고 있어 추가 인프라 없이 DID를 즉시 파생할 수 있다.
+- 형식: `did:key:z<base58btc(multicodec(0x1200) || compressed_sec1)>` — [DID Key spec](https://w3c-ccg.github.io/did-method-key/) 호환.
+- 단점: 키 회전 불가. Passkey를 잃으면 DID도 사라진다. PoC 수준에서는 허용 가능.
+
+---
+
+## 9. VC 본문을 오프체인에 둔 이유
+
+**결정**: VC JSON 전체는 오프체인(localStorage + 파일 교환). 온체인에는 keccak256 hash만 기록(`VCRegistry.Issued.jsonHash`).
+
+**이유**:
+- W3C VC Data Model은 본래 portable off-chain 데이터로 설계됐다. VC는 Issuer → Holder → Verifier 흐름에서 파일로 전달되는 것이 표준적이다.
+- VC JSON을 온체인에 저장하면 가스비가 폭발적으로 늘어난다 (500+ bytes의 JSON을 calldata로). hash만 저장하면 `bytes32` 하나 = ~2만 gas.
+- 온체인 hash로 VC 진위와 미변조 여부를 검증할 수 있으므로 trustless 원칙이 유지된다.
+- 개인정보 측면에서도 VC 내용이 퍼블릭 체인에 영구 저장되지 않는다.
+
+---
+
+## 10. Subject DID 자기신고 모델
+
+**결정**: `requestVc(formatId, subjectDid)` 시 요청자가 자기 DID를 calldata로 제출한다. 컨트랙트는 DID와 주소의 연결을 검증하지 않는다.
+
+**이유**:
+- `PasskeyRegistry`는 credentialIdHash → AA 주소 매핑만 보관하며 공개키 자체를 저장하지 않는다. 따라서 컨트랙트 레벨에서 "이 DID가 이 주소에 속한다"를 검증할 수 없다.
+- 잘못된 DID를 제출하면 Issuer가 엉뚱한 공개키로 서명하게 되어 Holder 본인이 서명 검증을 통과할 수 없다 — 속이면 본인만 손해인 구조.
+- Issuer는 오프라인으로 Requester의 DID를 확인(예: 직접 연락)한 후 승인하면 된다. PoC 수준에서 충분한 신뢰 모델.
+- 향후 `PasskeyRegistry`에 pubKey를 직접 저장하거나 ZK proof로 "DID ↔ 주소" 연결을 증명하도록 확장 가능.
+
+---
+
+## 11. VP(Verifiable Presentation) 미구현 이유
+
+**결정**: VC 발급까지만 구현하고 VP(Verifiable Presentation) 생성 및 검증은 구현하지 않는다.
+
+**이유**:
+- VP는 Holder가 하나 이상의 VC를 선택적으로 묶어 Verifier에게 제시하는 개념. 별도의 VP 서명 흐름, Verifier 역할, 선택 공개(selective disclosure) 로직이 필요하다.
+- 이 PoC의 핵심 시연 목표는 "Passkey → DID 파생 → VC 발급 → 온체인 hash 검증"이다. VP는 그 다음 레이어.
+- VC 자체는 W3C VC Data Model 1.1 호환 JSON으로 유지되므로 향후 `jwt-vp` 또는 `ldp-vp` 방식으로 VP를 추가할 수 있도록 설계됐다.
